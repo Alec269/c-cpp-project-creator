@@ -1,0 +1,73 @@
+{
+   "name": "c-cpp-project-creator",
+   "displayName": "C/C++ Project Creator",
+   "description": "Generate C and C++ project templates with CMake, VCpkg, and VSCode configuration",
+   "version": "1.0.0",
+   "publisher": "Alec269",
+   "icon": "icon.png",
+
+   "engines": {
+      "vscode": "^1.70.0"
+   },
+   "categories": [
+      "Other",
+      "Snippets"
+   ],
+   "keywords": [
+      "c",
+      "cpp",
+      "c++",
+      "cmake",
+      "vcpkg",
+      "project template",
+      "boilerplate"
+   ],
+   "activationEvents": [],
+   "main": "./out/extension.js",
+   "contributes": {
+      "commands": [
+         {
+            "command": "cpp-project-generator.createCProject",
+            "title": "Create C Project",
+            "category": "C/C++ Generator"
+         },
+         {
+            "command": "cpp-project-generator.createCppProject",
+            "title": "Create C++ Project",
+            "category": "C/C++ Generator"
+         }
+      ],
+      "menus": {
+         "explorer/context": [
+            {
+               "when": "explorerResourceIsFolder",
+               "command": "cpp-project-generator.createCProject",
+               "group": "2_workspace@1"
+            },
+            {
+               "when": "explorerResourceIsFolder",
+               "command": "cpp-project-generator.createCppProject",
+               "group": "2_workspace@2"
+            }
+         ],
+         "commandPalette": [
+            {
+               "command": "cpp-project-generator.createCProject"
+            },
+            {
+               "command": "cpp-project-generator.createCppProject"
+            }
+         ]
+      }
+   },
+   "scripts": {
+      "vscode:prepublish": "npm run compile",
+      "compile": "tsc -p ./",
+      "watch": "tsc -watch -p ./"
+   },
+   "devDependencies": {
+      "@types/node": "18.x",
+      "@types/vscode": "^1.70.0",
+      "typescript": "^4.9.4"
+   }
+}

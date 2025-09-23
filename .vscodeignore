@@ -1,0 +1,8 @@
+# ship only compiled JS, not TS
+src/
+tsconfig.json
+
+# ignore dev stuff
+node_modules/
+.vscode/
+.git/
