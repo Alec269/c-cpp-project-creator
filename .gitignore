@@ -1,4 +1,4 @@
 # ignore dev stuff
 node_modules/
 out/
-/c-cpp-project-creator-1.0.0.vsix
+/*.vsix

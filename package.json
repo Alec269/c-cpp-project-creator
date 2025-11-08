@@ -2,10 +2,18 @@
    "name": "c-cpp-project-creator",
    "displayName": "C/C++ Project Creator",
    "description": "Generate C and C++ project templates with CMake, VCpkg, and VSCode configuration",
-   "version": "1.0.0",
+   "version": "1.0.0+1",
+    "license": "ARR",
    "publisher": "Alec269",
    "icon": "icon.png",
-
+   "repository": {
+      "type": "git",
+      "url": "https://github.com/Alec269/c-cpp-project-creator.git"
+   },
+   "bugs": {
+      "url": "https://github.com/Alec269/c-cpp-project-creator.git"
+   },
+   "url": "https://github.com/Alec269/c-cpp-project-creator.git#readme",
    "engines": {
       "vscode": "^1.70.0"
    },

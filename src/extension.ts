@@ -3,6 +3,21 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// ============================================================================
+// TYPES AND INTERFACES
+// ============================================================================
+
+type Language = 'c' | 'cpp';
+
+interface ProjectFile {
+    path: string;
+    content: string;
+}
+
+// ============================================================================
+// EXTENSION ACTIVATION
+// ============================================================================
+
 export function activate(context: vscode.ExtensionContext) {
     let createCProject = vscode.commands.registerCommand('cpp-project-generator.createCProject', () => {
         createProject('c');
@@ -15,7 +30,13 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(createCProject, createCppProject);
 }
 
-async function createProject(language: 'c' | 'cpp') {
+export function deactivate() { }
+
+// ============================================================================
+// MAIN PROJECT CREATION LOGIC
+// ============================================================================
+
+async function createProject(language: Language) {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
         vscode.window.showErrorMessage('Please open a workspace folder first.');
@@ -34,6 +55,20 @@ async function createProject(language: 'c' | 'cpp') {
     const rootPath = workspaceFolders[0].uri.fsPath;
 
     // Check if workspace is empty or confirm overwrite
+    if (!await confirmWorkspaceOverwrite(rootPath)) {
+        return;
+    }
+
+    try {
+        await createProjectStructure(rootPath, projectName, language);
+        vscode.window.showInformationMessage(`${language.toUpperCase()} project '${projectName}' created successfully in current workspace!`);
+        await vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error creating project: ${error}`);
+    }
+}
+
+async function confirmWorkspaceOverwrite(rootPath: string): Promise<boolean> {
     const files = fs.readdirSync(rootPath);
     const hasFiles = files.some(file => !file.startsWith('.') && file !== 'node_modules');
 
@@ -43,27 +78,25 @@ async function createProject(language: 'c' | 'cpp') {
             'Yes, Continue',
             'Cancel'
         );
-
-        if (choice !== 'Yes, Continue') {
-            return;
-        }
+        return choice === 'Yes, Continue';
     }
-
-    try {
-        // Create all project files and folders in the current workspace
-        await createProjectStructure(rootPath, projectName, language);
-
-        vscode.window.showInformationMessage(`${language.toUpperCase()} project '${projectName}' created successfully in current workspace!`);
-
-        // Refresh workspace
-        await vscode.commands.executeCommand('workbench.files.action.refreshFilesExplorer');
-    } catch (error) {
-        vscode.window.showErrorMessage(`Error creating project: ${error}`);
-    }
+    return true;
 }
 
-async function createProjectStructure(projectPath: string, projectName: string, language: 'c' | 'cpp') {
+// ============================================================================
+// PROJECT STRUCTURE CREATION
+// ============================================================================
+
+async function createProjectStructure(projectPath: string, projectName: string, language: Language) {
     // Create directories
+    createDirectories(projectPath);
+
+    // Generate and write all project files
+    const files = generateProjectFiles(projectName, language);
+    writeProjectFiles(projectPath, files);
+}
+
+function createDirectories(projectPath: string) {
     const directories = ['.vscode', 'src', 'include'];
     directories.forEach(dir => {
         const dirPath = path.join(projectPath, dir);
@@ -71,39 +104,18 @@ async function createProjectStructure(projectPath: string, projectName: string, 
             fs.mkdirSync(dirPath, { recursive: true });
         }
     });
+}
 
-    // Create files
-    const files = {
-        // VSCode configuration files
-        '.vscode/c_cpp_properties.json': createCppPropertiesJson(language),
-        '.vscode/settings.json': createSettingsJson(),
-        '.vscode/tasks.json': createTasksJson(projectName),
-        '.vscode/launch.json': createLaunchJson(projectName),
-
-        // Source files
-        [`src/main.${language === 'c' ? 'c' : 'cpp'}`]: createMainFile(language),
-
-        // CMake
-        'CMakeLists.txt': createCMakeFile(projectName, language),
-
-        // Configuration files
-        '.editorconfig': createEditorConfig(),
-        '.clang-format': createClangFormat(),
-        'vcpkg.json': createVcpkgJson(projectName),
-        '.gitignore': createGitIgnore(),
-        '.gitattributes': createGitAttributes(),
-        'README.md': createReadme(projectName, language)
-    };
-
-    for (const [filePath, content] of Object.entries(files)) {
-        const fullPath = path.join(projectPath, filePath);
+function writeProjectFiles(projectPath: string, files: ProjectFile[]) {
+    for (const file of files) {
+        const fullPath = path.join(projectPath, file.path);
         const dir = path.dirname(fullPath);
 
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
 
-        fs.writeFileSync(fullPath, toCRLF(content), 'utf8');
+        fs.writeFileSync(fullPath, toCRLF(file.content), 'utf8');
     }
 }
 
@@ -111,8 +123,43 @@ function toCRLF(content: string): string {
     return content.replace(/\r?\n/g, "\r\n");
 }
 
+// ============================================================================
+// PROJECT FILE GENERATION
+// ============================================================================
 
-function createCppPropertiesJson(language: 'c' | 'cpp'): string {
+function generateProjectFiles(projectName: string, language: Language): ProjectFile[] {
+    return [
+        // VSCode configuration files
+        { path: '.vscode/c_cpp_properties.json', content: createCppPropertiesJson(language) },
+        { path: '.vscode/settings.json', content: createSettingsJson() },
+        { path: '.vscode/tasks.json', content: createTasksJson(projectName) },
+        { path: '.vscode/launch.json', content: createLaunchJson(projectName) },
+
+        // Source files
+        { path: `src/main.${language === 'c' ? 'c' : 'cpp'}`, content: createMainFile(language) },
+
+        // Build system
+        { path: 'CMakeLists.txt', content: createCMakeFile(projectName, language) },
+
+        // Configuration files
+        { path: '.editorconfig', content: createEditorConfig() },
+        { path: '.clang-format', content: createClangFormat() },
+        { path: 'vcpkg.json', content: createVcpkgJson(projectName) },
+
+        // Git configuration
+        { path: '.gitignore', content: createGitIgnore() },
+        { path: '.gitattributes', content: createGitAttributes() },
+
+        // Documentation
+        { path: 'README.md', content: createReadme(projectName, language) }
+    ];
+}
+
+// ============================================================================
+// VSCODE CONFIGURATION FILE TEMPLATES
+// ============================================================================
+
+function createCppPropertiesJson(language: Language): string {
     return JSON.stringify({
         "configurations": [
             {
@@ -130,11 +177,11 @@ function createCppPropertiesJson(language: 'c' | 'cpp'): string {
                 "compilerPath": language === 'c' ? "C:/msys64/mingw64/bin/gcc.exe" : "C:/msys64/mingw64/bin/g++.exe",
                 "cStandard": "c17",
                 "cppStandard": "c++20",
-                "intelliSenseMode": "windows-gcc-x64",
+                "intelliSenseMode": "windows-msvc-x64",
                 "configurationProvider": "ms-vscode.cmake-tools"
             },
             {
-                "name": "Linux",
+                "name": "linux",
                 "includePath": [
                     "${workspaceFolder}/**",
                     "${workspaceFolder}/include"
@@ -147,7 +194,7 @@ function createCppPropertiesJson(language: 'c' | 'cpp'): string {
                 "configurationProvider": "ms-vscode.cmake-tools"
             },
             {
-                "name": "Mac",
+                "name": "darwin",
                 "includePath": [
                     "${workspaceFolder}/**",
                     "${workspaceFolder}/include"
@@ -164,7 +211,7 @@ function createCppPropertiesJson(language: 'c' | 'cpp'): string {
             }
         ],
         "version": 4
-    }, null, 4);
+    }, null, 2);
 }
 
 function createSettingsJson(): string {
@@ -180,8 +227,14 @@ function createSettingsJson(): string {
         //"editor.formatOnSave": true,
         //"C_Cpp.default.formatStyle": "file",
         "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: Google, IndentWidth: 3, TabWidth: 3 }",
-        "cmake.generator": "Ninja"
-    }, null, 4);
+        "cmake.generator": "Ninja",
+        "cSpell.words": [
+            "MSVC",
+            "vcpkg",
+            "Allman",
+            "msvc"
+        ]
+    }, null, 2);
 }
 
 function createTasksJson(projectName: string): string {
@@ -211,7 +264,7 @@ function createTasksJson(projectName: string): string {
                 "group": "build"
             }
         ]
-    }, null, 4);
+    }, null, 2);
 }
 
 function createLaunchJson(projectName: string): string {
@@ -240,33 +293,43 @@ function createLaunchJson(projectName: string): string {
 
             }
         ]
-    }, null, 4);
+    }, null, 2);
 }
 
-function createMainFile(language: 'c' | 'cpp'): string {
+// ============================================================================
+// SOURCE FILE TEMPLATES
+// ============================================================================
+
+function createMainFile(language: Language): string {
     if (language === 'c') {
         return `#include <stdio.h>
 
-int main() {
-    printf("Hello, World!\\n");
+int main() 
+{
+   printf("Hello, World!\\n");
 
-    return 0;
+   return 0;
 }
 `;
     } else {
         return `#include <iostream>
 
-int main() {
+int main() 
+{
 
-    std::cout << "Hello, World!" << std::endl;
+   std::cout << "Hello, World!" << std::endl;
 
-    return 0;
+   return 0;
 }
 `;
     }
 }
 
-function createCMakeFile(projectName: string, language: 'c' | 'cpp'): string {
+// ============================================================================
+// BUILD SYSTEM TEMPLATES
+// ============================================================================
+
+function createCMakeFile(projectName: string, language: Language): string {
 
     let filecontent: string;
     const standard = language === 'c' ? '17' : '20';
@@ -274,91 +337,95 @@ function createCMakeFile(projectName: string, language: 'c' | 'cpp'): string {
         const langUpper = 'CXX';
         filecontent = `cmake_minimum_required(VERSION 3.15)
 
-    project(${projectName} LANGUAGES ${langUpper})
-        
-    # Set ${langUpper} standard
-    set(CMAKE_${langUpper}_STANDARD ${standard})
-    set(CMAKE_${langUpper}_STANDARD_REQUIRED ON)
-        
-    # Find vcpkg packages if available
-    find_package(PkgConfig QUIET)
-        
-    # Include directories
-    include_directories(include)
-        
-    # Add executable
-    add_executable(${projectName} 
-            src/main.cpp
-    )
-        
-    # Compiler-specific options
-    if(MSVC)
-        target_compile_options(${projectName} PRIVATE /W4)
-    else()
-        target_compile_options(${projectName} PRIVATE -Wall -Wextra -Wpedantic)
+project(${projectName} LANGUAGES ${langUpper})
+    
+# Set ${langUpper} standard
+set(CMAKE_${langUpper}_STANDARD ${standard})
+set(CMAKE_${langUpper}_STANDARD_REQUIRED ON)
+    
+# Find vcpkg packages if available
+find_package(PkgConfig QUIET)
+    
+# Include directories
+include_directories(include)
+    
+# Add executable
+add_executable(${projectName} 
+        src/main.cpp
+)
+    
+# Compiler-specific options
+if(MSVC)
+    target_compile_options(${projectName} PRIVATE /W4)
+else()
+    target_compile_options(${projectName} PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+    
+# Debug configuration
+set(CMAKE_BUILD_TYPE Debug)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(${projectName} PRIVATE DEBUG)
+    if(NOT MSVC)
+        target_compile_options(${projectName} PRIVATE -g -O0)
     endif()
-        
-    # Debug configuration
-    set(CMAKE_BUILD_TYPE Debug)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_definitions(${projectName} PRIVATE DEBUG)
-        if(NOT MSVC)
-            target_compile_options(${projectName} PRIVATE -g -O0)
-        endif()
-    endif()
-        
-    # Enable testing
-    enable_testing()
-        
-    # Install target
-    #install(TARGETS ${projectName} RUNTIME DESTINATION bin)
-    `
+endif()
+    
+# Enable testing
+enable_testing()
+    
+# Install target
+#install(TARGETS ${projectName} RUNTIME DESTINATION bin)
+`
     } else {
         const langUpper = language.toUpperCase();
         filecontent = `cmake_minimum_required(VERSION 3.15)
-    project(${projectName} LANGUAGES ${langUpper})
-    
-    # Set ${langUpper} standard
-    set(CMAKE_${langUpper}_STANDARD ${standard})
-    set(CMAKE_${langUpper}_STANDARD_REQUIRED ON)
-    
-    # Find vcpkg packages if available
-    find_package(PkgConfig QUIET)
-    
-    # Include directories
-    include_directories(include)
-    
-    # Add executable
-    add_executable(${projectName} 
-        src/main.${language === 'c' ? 'c' : 'cpp'}
-    )
-    
-    # Compiler-specific options
-    if(MSVC)
-        target_compile_options(${projectName} PRIVATE /W4)
-    else()
-        target_compile_options(${projectName} PRIVATE -Wall -Wextra -Wpedantic)
+project(${projectName} LANGUAGES ${langUpper})
+
+# Set ${langUpper} standard
+set(CMAKE_${langUpper}_STANDARD ${standard})
+set(CMAKE_${langUpper}_STANDARD_REQUIRED ON)
+
+# Find vcpkg packages if available
+find_package(PkgConfig QUIET)
+
+# Include directories
+include_directories(include)
+
+# Add executable
+add_executable(${projectName} 
+    src/main.${language === 'c' ? 'c' : 'cpp'}
+)
+
+# Compiler-specific options
+if(MSVC)
+    target_compile_options(${projectName} PRIVATE /W4)
+else()
+    target_compile_options(${projectName} PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# Debug configuration
+set(CMAKE_BUILD_TYPE Debug)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(${projectName} PRIVATE DEBUG)
+    if(NOT MSVC)
+        target_compile_options(${projectName} PRIVATE -g -O0)
     endif()
-    
-    # Debug configuration
-    set(CMAKE_BUILD_TYPE Debug)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_definitions(${projectName} PRIVATE DEBUG)
-        if(NOT MSVC)
-            target_compile_options(${projectName} PRIVATE -g -O0)
-        endif()
-    endif()
-    
-    # Enable testing
-    enable_testing()
-    
-    # Install target
-    #install(TARGETS ${projectName}  RUNTIME DESTINATION bin)
-        `
+endif()
+
+# Enable testing
+enable_testing()
+
+# Install target
+#install(TARGETS ${projectName}  RUNTIME DESTINATION bin)
+    `
     }
     return filecontent;
 
 }
+
+// ============================================================================
+// CONFIGURATION FILE TEMPLATES
+// ============================================================================
 
 function createEditorConfig(): string {
     return `root = true
@@ -448,7 +515,7 @@ SpacesInContainerLiterals: true
 SpacesInCStyleCastParentheses: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
-Standard: Cpp11
+Standard: Cpp17
 `;
 }
 
@@ -459,17 +526,22 @@ function createVcpkgJson(projectName: string): string {
         "description": `A ${projectName} project using vcpkg for dependency management`,
         "homepage": "",
         "dependencies": [],
-        "builtin-baseline": "x-custom-baseline",
+        "builtin-baseline": "b1b19307e2d2ec1eefbdb7ea069de7d4bcd31f01",
+        "comment":"Use latest vcpkg git commit as baseline",
         "overrides": []
-    }, null, 4);
+    }, null, 2);
 }
+
+// ============================================================================
+// GIT CONFIGURATION TEMPLATES
+// ============================================================================
 
 function createGitIgnore(): string {
     return `# Build directories
 build/
 out/
 .vs/
-.vscode/settings.json
+.vscode/
 
 # Compiled Object files
 *.obj
@@ -562,7 +634,7 @@ Thumbs.db
 }
 
 function createGitAttributes(): string {
-    return `# Auto detect text files and perform LF normalization
+    return `# Auto detect text files and perform CRLF normalization
 * text=auto
 
 # Custom for Visual Studio
@@ -582,12 +654,14 @@ function createGitAttributes(): string {
 
 # C/C++ files
 *.c      text diff=c   eol=crlf
+*.h      text diff=c   eol=crlf
+*.i      text diff=c   eol=crlf
 *.cc     text diff=cpp eol=crlf
 *.cxx    text diff=cpp eol=crlf
 *.cpp    text diff=cpp eol=crlf
 *.c++    text diff=cpp eol=crlf
+*.ixx    text diff=cpp eol=crlf
 *.hpp    text diff=cpp eol=crlf
-*.h      text diff=c   eol=crlf
 *.h++    text diff=cpp eol=crlf
 *.hh     text diff=cpp eol=crlf
 
@@ -598,32 +672,41 @@ function createGitAttributes(): string {
 *.tgz    binary
 *.zip    binary
 
-# Text files should always have LF endings
+# Text files should always have CRLF endings
 *.txt    text eol=crlf
 *.md     text eol=crlf
 *.yml    text eol=crlf
 *.yaml   text eol=crlf
 *.json   text eol=crlf
 
-# Shell scripts should always have LF endings
-*.sh     text eol=lf
-
 # Windows batch files should have CRLF endings
 *.bat    text eol=crlf
 *.cmd    text eol=crlf
+
+# Shell scripts should always have LF endings
+*.sh     text eol=lf
+*.fish   text eol=lf
+# git
+.gitignore      text eol=lf
+.gitattributes  text eol=lf
+
 `;
 }
 
-function createReadme(projectName: string, language: 'c' | 'cpp'): string {
+// ============================================================================
+// DOCUMENTATION TEMPLATES
+// ============================================================================
+
+function createReadme(projectName: string, language: Language): string {
     const langUpper = language.toUpperCase();
     return `# ${projectName}
 
-A ${langUpper} project created with the VSCode ${langUpper} Project Generator extension.
+A ${langUpper} project created with the VSCode **C/C++ Project Creator** extension.
 
 ## Prerequisites
 
 - CMake 3.15 or higher
-- ${language === 'c' ? 'GCC/Clang C compiler' : 'GCC/Clang C++ compiler'}
+- ${language === 'c' ? 'GCC/Clang C compiler' : 'GCC/Clang C++ compiler'}  (MSVC can be used via CMakePresets.json)
 - vcpkg (optional, for package management)
 
 ## Building
@@ -637,7 +720,7 @@ A ${langUpper} project created with the VSCode ${langUpper} Project Generator ex
 
 ### Command Line
 
-\`\`\`bash
+\`\`\`sh
 # Create build directory
 mkdir build && cd build
 
@@ -648,18 +731,22 @@ cmake ..
 cmake --build .
 
 # Run
-./${projectName}
+.\\${projectName}
+
+#If using msvc
+.\\Debug\\${projectName}.exe
+
 \`\`\`
 
 ## Project Structure
 
-\`\`\`
-${projectName}/
-├── .vscode/              # VSCode configuration
-├── src/                  # Source files
-├── include/              # Header files
-├── build/               # Build output (generated)
-├── CMakeLists.txt       # CMake configuration
+\`\`\`sh
+Project-Directory/
+├── .vscode/            # VSCode configuration
+├── src/                # Source files
+├── include/            # Header files
+├── build/              # Build output (generated)
+├── CMakeLists.txt      # CMake configuration
 ├── vcpkg.json          # vcpkg dependencies
 ├── .clang-format       # Code formatting rules
 ├── .editorconfig       # Editor configuration
@@ -675,13 +762,13 @@ ${projectName}/
 - vcpkg integration for package management
 - Clang-format for code formatting
 - VSCode debugging configuration
-- Cross-platform support (Windows, Linux, macOS)
+- Cross-platform support (Windows, linux, macOS)
 
 ## Adding Dependencies
 
 Edit \`vcpkg.json\` to add dependencies:
 
-\`\`\`json
+\`\`\`jsonc
 {
   "dependencies": [
     "fmt",
@@ -697,6 +784,3 @@ Then reconfigure CMake to install the dependencies.
 Press \`F5\` in VSCode to start debugging, or use the "Debug" configuration in the Run and Debug panel.
 `;
 }
-
-export function deactivate() { }
-`;`
