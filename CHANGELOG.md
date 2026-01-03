@@ -22,8 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.clang-format`, `.editorconfig`, `.gitignore`, `.gitattributes`
 - Basic README.md
 
-## [1.1.0] - 2026-01-03
+## [1.1.0] - 2026-01-02
 
+- Minor Update
 - Cleaned up formatting of generated files
 - Moved to CMake version: `4.0` and C++ version: `23`
 - Made necessary changes to `CMakeLists.txt`
@@ -31,5 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added example baseline for `vcpkg`
 - Improved the contents of `main` source file
 - Minor changes to `README.md`
+
+## [1.1.1] - 2026-01-3
+
+- Patch Update
+  - fixed optional `vcpkg.cmake` path in `CMakeLists.txt` (*BackSlashes → NormalSlashes*)
+  - Added the latest **vcpkg** commit *SHA* as *builtin baseline* (will not change unless necessary)
 
 -----

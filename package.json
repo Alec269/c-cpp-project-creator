@@ -2,7 +2,7 @@
    "name": "c-cpp-project-creator",
    "displayName": "C/C++ Project Creator",
    "description": "Generate Modern C and C++ project templates with CMake, VCpkg, and VSCode configuration",
-   "version": "1.1.0",
+   "version": "1.1.1",
     "license": "All Rights Reserved",
    "publisher": "Alec269",
    "icon": "icon.png",

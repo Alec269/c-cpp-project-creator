@@ -56,3 +56,9 @@ my-project/
   - Moved to CMake v4
   - Changed Formatting
   - Improved **build** and **source** files
+
+### 1.1.1
+
+- Patch Update
+  - fixed optional `vcpkg.cmake` path in CMakeLists.txt
+  - Added the latest **vcpkg** commit *SHA* as *builtin baseline* (will not change unless necessary)

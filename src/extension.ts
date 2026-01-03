@@ -234,10 +234,11 @@ function createSettingsJson(): string {
 		"C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: Google, IndentWidth: 3, TabWidth: 3 }",
 		"cmake.generator": "Ninja",
 		"cSpell.words": [
-			"MSVC",
-			"vcpkg",
 			"Allman",
-			"msvc"
+   	   "buildsystems",
+      	"msvc",
+      	"MSVC",
+      	"vcpkg"
 		]
 	}, null, 3);
 }
@@ -352,7 +353,7 @@ function createCMakeFile(projectName: string, language: ProjType): string {
 		filecontent = `cmake_minimum_required(VERSION 4.0)
 
 #set(CMAKE_TOOLCHAIN_FILE
-#    "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake"
+#    "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/vcpkg/scripts/buildsystems/vcpkg.cmake"
 #    CACHE STRING "Vcpkg toolchain file"
 #)
 
@@ -595,7 +596,7 @@ function createVcpkgJson(projectName: string): string {
 		"description": `A ${projectName} project using vcpkg for dependency management generated with C/C++ Project Creator extension`,
 		"homepage": "",
 		"dependencies": [],
-		"builtin-baseline": "b1b19307e2d2ec1eefbdb7ea069de7d4bcd31f01",
+		"builtin-baseline": "af752f21c9d79ba3df9cb0250ce2233933f58486",
 		"overrides": []
 	}, null, 2);
 }
