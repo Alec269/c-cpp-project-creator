@@ -1,8 +1,10 @@
+
 *.ts text eol=crlf
 *.json text eol=crlf
 *.md text eol=crlf
-*.text text eol=crlf
+*.txt text eol=crlf
 *.js text eol=crlf
+.vscodeignore text eol=crlf
 
 .gitattributes text eol=lf
 .gitignore text eol=lf

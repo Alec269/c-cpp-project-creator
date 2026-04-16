@@ -2,8 +2,24 @@
    "files.eol": "\r\n",
    "cSpell.words": [
       "Allman",
+      "binlog",
       "buildsystems",
+      "constexpr",
+      "cout",
+      "cppdbg",
+      "cppm",
+      "metaproj",
       "MSVC",
-      "msys"
+      "msys",
+      "msysgit",
+      "opendb",
+      "penv",
+      "pidb",
+      "PROJECTNAME",
+      "Reflow",
+      "runsheet",
+      "smod",
+      "vspx",
+      "Wpedantic"
    ],
 }

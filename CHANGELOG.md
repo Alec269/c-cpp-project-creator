@@ -39,4 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - fixed optional `vcpkg.cmake` path in `CMakeLists.txt` (*BackSlashes → NormalSlashes*)
   - Added the latest **vcpkg** commit *SHA* as *builtin baseline* (will not change unless necessary)
 
+## [1.2.0] - 2026-04-16
+
+- Minor Update
+  - Changed *formatting* for source files
+  - *Improved* content of generated files
+  - reverted minimum required `cmake` version to `3.31`
+  - Changed **Licensing Model**
+  - Added Important info relating to vcpkg
+
 -----

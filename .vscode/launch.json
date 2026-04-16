@@ -8,6 +8,6 @@
          "args": [
             "--extensionDevelopmentPath=${workspaceFolder}"
          ]
-      }
+      },
    ]
 }

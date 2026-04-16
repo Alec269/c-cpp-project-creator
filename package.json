@@ -1,9 +1,9 @@
 {
    "name": "c-cpp-project-creator",
    "displayName": "C/C++ Project Creator",
-   "description": "Generate Modern C and C++ project templates with CMake, VCpkg, and VSCode configuration",
-   "version": "1.1.1",
-    "license": "All Rights Reserved",
+   "description": "Generate Modern C and C++ project templates with CMake, VCpkg, and VSCode configurations",
+   "version": "1.2.0",
+   "license": "MIT",
    "publisher": "Alec269",
    "icon": "icon.png",
    "repository": {
@@ -28,7 +28,10 @@
       "cmake",
       "vcpkg",
       "project template",
-      "boilerplate"
+      "boilerplate",
+      "module",
+      "setup",
+      "design"
    ],
    "activationEvents": [],
    "main": "./out/extension.js",
@@ -74,7 +77,7 @@
       "watch": "tsc -watch -p ./"
    },
    "devDependencies": {
-      "@types/node": "18.x",
+      "@types/node": "^18.19.130",
       "@types/vscode": "^1.70.0",
       "typescript": "^4.9.4"
    }

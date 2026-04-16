@@ -33,14 +33,15 @@ It sets up a standard project structure with `src/`, `include/`, `.vscode` confi
 
 ```cs
 my-project/
-   ├── .vscode/ # VSCode configuration
-   ├── src/ # Source files
-   ├── include/ # Header files
-   ├── CMakeLists.txt # CMake configuration
-   ├── .clang-format # Code formatting rules
-   ├── .editorconfig # Editor configuration
-   ├── .gitignore # Git ignore rules
-   ├── .gitattributes # Git attributes
+   ├── .vscode/         # VSCode configuration
+   ├── src/             # Source files
+   ├── include/         # Header files
+   ├── CMakeLists.txt   # CMake configuration
+   ├── .clang-format    # Code formatting rules
+   ├── .editorconfig    # Editor configuration
+   ├── .gitignore       # Git ignore rules
+   ├── .gitattributes   # Git attributes
+   ├── ChangeLog.md     # Change log
    └── README.md 
 ```
 
@@ -62,3 +63,9 @@ my-project/
 - Patch Update
   - fixed optional `vcpkg.cmake` path in CMakeLists.txt
   - Added the latest **vcpkg** commit *SHA* as *builtin baseline* (will not change unless necessary)
+
+## [1.2.0] - 2026-04-16
+
+- See ChangeLog
+
+From now on Changes shall only be recorded in the ChangeLog of this extension.
