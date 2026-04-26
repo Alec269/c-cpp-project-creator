@@ -48,4 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Changed **Licensing Model**
   - Added Important info relating to vcpkg
 
------
+## [1.3.0] - 2026-04-27
+
+- Minor Update
+  - Added `deps\`, `docs\` folders
+  - Added a preconfigured `CMakePresets.json` file (Which must be edited before usage)
+    - Must change the `CMAKE_C_COMPILER` ,`CMAKE_CXX_COMPILER` cache variables to point to the correct locations
+    - If using `Visual Studio 2026` user must change the generator to "Visual Studio 18 2026"
+  - Added proper `debug` and `release` mode setup.
+  - Improved config files

@@ -92,7 +92,7 @@ async function createProjectStructure(projectPath: string, projectName: string, 
 }
 
 function createDirectories(projectPath: string) {
-   const directories = ['.vscode', 'src', 'include'];
+   const directories = ['.vscode', 'src', 'deps', 'include', 'docs'];
    directories.forEach(dir => {
       const dirPath = path.join(projectPath, dir);
       if (!fs.existsSync(dirPath)) {
@@ -125,15 +125,17 @@ function generateProjectFiles(projectName: string, language: ProjType): ProjectF
       // VSCode configuration files
       { path: '.vscode/c_cpp_properties.json', content: createCppPropertiesJson(language) },
       { path: '.vscode/settings.json', content: createSettingsJson() },
-      { path: '.vscode/tasks.json', content: createTasksJson(projectName) },
+      { path: '.vscode/tasks.json', content: createTasksJson() },
       { path: '.vscode/launch.json', content: createLaunchJson(projectName) },
-      { path: '.vscode/extensions.json', content: createExtJson(projectName) },
+      { path: '.vscode/extensions.json', content: createExtJson() },
 
       // Source files
       { path: `src/main.${language === 'c' ? 'c' : 'cpp'}`, content: createMainFile(language) },
+      { path: `src/main.${language === 'c' ? 'h' : 'hpp'}`, content: createMainHeaderFile(language) },
 
       // Build system
       { path: 'CMakeLists.txt', content: createCMakeFile(projectName, language) },
+      { path: 'CMakePresets.json', content: createCMakePresetsFile() },
 
       // Configuration files
       { path: '.editorconfig', content: createEditorConfig() },
@@ -211,6 +213,9 @@ function createSettingsJson(): string {
    return JSON.stringify({
       "cmake.buildDirectory": "${workspaceFolder}/out/build/",
       //"cmake.configureOnOpen": true,
+      "material-icon-theme.folders.associations": {
+         "deps": "include"
+      },
       "files.associations": {
          "*.h": "c",
          "*.hpp": "cpp",
@@ -236,6 +241,7 @@ function createSettingsJson(): string {
          "opendb",
          "penv",
          "pidb",
+         "pkgs",
          "PROJECTNAME",
          "Reflow",
          "runsheet",
@@ -252,7 +258,7 @@ function createSettingsJson(): string {
    }, null, 3);
 }
 
-function createTasksJson(projectName: string): string {
+function createTasksJson(): string {
    return JSON.stringify({
       "version": "2.0.0",
       "tasks": [
@@ -323,7 +329,7 @@ function createLaunchJson(projectName: string): string {
    }, null, 3);
 }
 
-function createExtJson(projectName: string): string {
+function createExtJson(): string {
    return JSON.stringify({
       "recommendations": [
          "alec269.cmake-output-colouriser",
@@ -338,6 +344,8 @@ function createExtJson(projectName: string): string {
 function createMainFile(language: ProjType): string {
    if (language === 'c') {
       return `#include <stdio.h>
+
+#include "main.h"
 
 int main()
 {
@@ -355,6 +363,8 @@ int main()
    } else {
       return `#include <iostream>
 #include <print>
+
+#include "main.hpp"
 
 int main( int argc, char* argv[] )
 {
@@ -377,21 +387,38 @@ int main( int argc, char* argv[] )
    }
 }
 
+function createMainHeaderFile(language: ProjType): string {
+   if (language === 'c') {
+      return (
+         ` 
+// add declarations here
+         `
+      );
+   } else {
+      return (
+         `#pragma once
+// add declarations here
+         `
+      );
+   }
+}
+
 //# ------------------------------ BUILD SYSTEM TEMPLATES  ------------------------------ //
 
 function createCMakeFile(projectName: string, language: ProjType): string {
 
-   let fileContent: string;
-   const standard = language === 'c' ? '17' : '23';
-   if (language == 'cpp') {
-      const langUpper = 'CXX';
-      fileContent = `cmake_minimum_required(VERSION 3.31)
+   const standard = (language === 'c' ? '17' : '23');
+   const langUpper = (language === 'c' ? 'C' : 'CXX');
+   return (
+      `
+cmake_minimum_required(VERSION 3.31)
 
+# # if you wish to use \`vcpkg\`
 # Add the following to CMake cache variable in 'CMakePresets.json'
 # "CMAKE_TOOLCHAIN_FILE":"$penv{VCPKG_ROOT}\\scripts\\buildsystems\\vcpkg.cmake"
 # Also, make sure 'VCPKG_ROOT' is defined in User Environment variables
 
-project(${projectName} LANGUAGES ${langUpper})
+project(${projectName} LANGUAGES ${langUpper} VERSION 0.1.0)
     
 # Set ${langUpper} standard
 set(CMAKE_${langUpper}_STANDARD ${standard})
@@ -403,13 +430,16 @@ find_package(PkgConfig QUIET)
     
 # Add executable
 add_executable(\${PROJECT_NAME} 
-   src/main.cpp
+   src/main.${langUpper === 'CXX' ? 'cpp' : 'c'}
+   src/main.${langUpper === 'CXX' ? 'hpp' : 'h'}
 )
 
 target_include_directories(\${PROJECT_NAME} PRIVATE
    \${CMAKE_SOURCE_DIR}/include
 )
 
+# # If you get debugging issues
+# comment the below 7 lines (31 - 37)
 set(ABS_BIN_DIR \${CMAKE_SOURCE_DIR}/out/build/bin)
 
 set_target_properties(\${PROJECT_NAME} PROPERTIES
@@ -418,92 +448,147 @@ set_target_properties(\${PROJECT_NAME} PROPERTIES
    ARCHIVE_OUTPUT_DIRECTORY \${ABS_BIN_DIR}
 )
 
-# Compiler-specific options
+# --- Compiler Options ---
 if(MSVC)
-   target_compile_options(\${PROJECT_NAME}  PRIVATE /W4 /permissive-)
+   target_compile_options(\${PROJECT_NAME} PRIVATE /W4 $<$<COMPILE_LANGUAGE:CXX>:/permissive->)
+   target_compile_options(\${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/Z7>)
+   target_compile_options(\${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/O2>)
+
+   if(USE_ASAN)
+      target_compile_options(\${PROJECT_NAME} PRIVATE /fsanitize=address)
+   endif()
 else()
-   target_compile_options(\${PROJECT_NAME}  PRIVATE -Wall -Wextra -Wpedantic)
+   target_compile_options(\${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
+   target_compile_options(\${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:-g3 -O0>)
+   target_compile_options(\${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:-O3>)
+
+   if(USE_ASAN)
+      target_compile_options(\${PROJECT_NAME} PRIVATE -fsanitize=address,undefined)
+      target_link_options(\${PROJECT_NAME} PRIVATE -fsanitize=address,undefined)
+   endif()
 endif()
-    
-# Debug-only flags (safe for all generators)
+
+# --- Linker Options (Incremental Handling) ---
+if(MSVC)
+   if(USE_ASAN)
+      # ASan is incompatible with incremental linking
+      target_link_options(\${PROJECT_NAME} PRIVATE /DEBUG /INCREMENTAL:NO)
+   else()
+      # Normal Debug & Release get incremental linking for speed
+      target_link_options(\${PROJECT_NAME} PRIVATE $<$<CONFIG:Debug>:/DEBUG /INCREMENTAL>)
+      target_link_options(\${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/INCREMENTAL>)
+   endif()
+endif()
+
+# --- Macros ---
 target_compile_definitions(\${PROJECT_NAME} PRIVATE
    $<$<CONFIG:Debug>:DEBUG>
+   $<$<CONFIG:Debug>:_DEBUG>
 )
 
-if(NOT MSVC)
-   target_compile_options(\${PROJECT_NAME} PRIVATE
-      $<$<CONFIG:Debug>:-g -O0>
-   )
-endif()
-    
-# Install target
-install(TARGETS \${PROJECT_NAME} RUNTIME DESTINATION bin)
+# Install logic
+install(TARGETS \${PROJECT_NAME}
+   RUNTIME DESTINATION bin    # .exe and .dll files
+   LIBRARY DESTINATION lib    # .so or .dylib files
+   ARCHIVE DESTINATION lib    # .lib files (static or import libs)
+   INCLUDES DESTINATION include
+)
 `
-   } else {
-      const langUpper = language.toUpperCase();
-      fileContent = `cmake_minimum_required(VERSION 3.31)
+   );
+}
 
-# Add the following to CMake cache variable in 'CMakePresets.json'
-# "CMAKE_TOOLCHAIN_FILE":"$penv{VCPKG_ROOT}\\scripts\\buildsystems\\vcpkg.cmake"
-# Also, make sure 'VCPKG_ROOT' is defined in User Environment variables
+function createCMakePresetsFile(): string {
 
-project(${projectName} LANGUAGES ${langUpper})
-
-# Set ${langUpper} standard
-set(CMAKE_${langUpper}_STANDARD ${standard})
-set(CMAKE_${langUpper}_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-# Find vcpkg packages if available
-find_package(PkgConfig QUIET)
-
-# Add executable
-add_executable(\${PROJECT_NAME} 
-   src/main.c
-)
-
-target_include_directories(\${PROJECT_NAME} PRIVATE
-   \${CMAKE_SOURCE_DIR}/include
-)
-
-set(ABS_BIN_DIR \${CMAKE_SOURCE_DIR}/out/build/bin)
-
-set_target_properties(\${PROJECT_NAME} PROPERTIES
-   RUNTIME_OUTPUT_DIRECTORY \${ABS_BIN_DIR}
-   LIBRARY_OUTPUT_DIRECTORY \${ABS_BIN_DIR}
-   ARCHIVE_OUTPUT_DIRECTORY \${ABS_BIN_DIR}
-)
-
-# Compiler-specific options
-if(MSVC)
-   target_compile_options(\${PROJECT_NAME}  PRIVATE /W4 /permissive-)
-else()
-   target_compile_options(\${PROJECT_NAME}  PRIVATE -Wall -Wextra -Wpedantic)
-endif()
-    
-# Debug-only flags (safe for all generators)
-target_compile_definitions(\${PROJECT_NAME} PRIVATE
-   $<$<CONFIG:Debug>:DEBUG>
-)
-
-if(NOT MSVC)
-   target_compile_options(\${PROJECT_NAME} PRIVATE
-      $<$<CONFIG:Debug>:-g -O0>
-   )
-endif()
-    
-# Install target
-install(TARGETS \${PROJECT_NAME} RUNTIME DESTINATION bin)
-`
-   }
-   return fileContent;
-
+   return JSON.stringify(
+      {
+         "version": 8,
+         "configurePresets": [
+            {
+               "name": "base",
+               "hidden": true,
+               "binaryDir": "${sourceDir}/out/build/${presetName}",
+               "generator": "Ninja",
+               "cacheVariables": {
+                  "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                  "CMAKE_C_COMPILER": "C:/Program Files/LLVM/bin/clang.exe",
+                  "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang++.exe",
+                  "USE_ASAN": "OFF"
+               }
+            },
+            {
+               "name": "Clang-Debug",
+               "inherits": "base",
+               "cacheVariables": {
+                  "CMAKE_BUILD_TYPE": "Debug"
+               }
+            },
+            {
+               "name": "Clang-Debug-ASan",
+               "inherits": "Clang-Debug",
+               "cacheVariables": {
+                  "USE_ASAN": "ON"
+               }
+            },
+            {
+               "name": "Clang-Release",
+               "inherits": "base",
+               "cacheVariables": {
+                  "CMAKE_BUILD_TYPE": "Release"
+               }
+            },
+            {
+               "name": "VSx64-17",
+               "generator": "Visual Studio 17 2022",
+               "toolset": "host=x64",
+               "architecture": "x64",
+               "binaryDir": "${sourceDir}/out/build/${presetName}",
+               "cacheVariables": {
+                  "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                  "USE_ASAN": "OFF"
+               }
+            }
+         ],
+         "buildPresets": [
+            {
+               "name": "Clang-Debug",
+               "configurePreset": "Clang-Debug"
+            },
+            {
+               "name": "Clang-ASan",
+               "configurePreset": "Clang-Debug-ASan"
+            },
+            {
+               "name": "Clang-Release",
+               "configurePreset": "Clang-Release"
+            },
+            {
+               "name": "VS-Debug",
+               "configurePreset": "VSx64-17",
+               "configuration": "Debug"
+            },
+            {
+               "name": "VS-ASan",
+               "configurePreset": "VSx64-17",
+               "configuration": "Debug",
+               "environment": {
+                  "USE_ASAN": "ON"
+               }
+            },
+            {
+               "name": "VS-Release",
+               "configurePreset": "VSx64-17",
+               "configuration": "Release"
+            }
+         ]
+      },
+      null, 3);
 }
 
 //# ------------------------------ CONFIGURATION FILE TEMPLATES ------------------------------ //
 
 function createEditorConfig(): string {
-   return `root = true
+   return (
+      `root = true
 
 [*]
 charset = utf-8
@@ -530,7 +615,10 @@ indent_size = 2
 
 [*.md]
 trim_trailing_whitespace = false
-`;
+indent_style = space
+indent_size = 2
+`
+   );
 }
 
 function createClangFormat(): string {
@@ -818,8 +906,11 @@ Project-Directory/
 ├── .vscode/            # VSCode configuration
 ├── src/                # Source files
 ├── include/            # Header files
+├── deps/               # manually collected pkgs
+├── docs/               # Project documentation
 ├── build/              # Build output (generated)
 ├── CMakeLists.txt      # CMake configuration
+├── CMakePresets.json   # CMake Presets
 ├── vcpkg.json          # vcpkg dependencies
 ├── .clang-format       # Code formatting rules
 ├── .editorconfig       # Editor configuration

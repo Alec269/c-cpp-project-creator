@@ -1,7 +1,7 @@
 # C/C++ Project Generator
 
 A VS Code extension to quickly generate starter **C** or **C++** projects using **CMake**.  
-It sets up a standard project structure with `src/`, `include/`, `.vscode` configs, and helpful defaults.
+It sets up a standard project structure with `src/`, `include/`, `.vscode/`, `deps/`, configs, and helpful defaults.
 
 ## Features
 
@@ -16,7 +16,8 @@ It sets up a standard project structure with `src/`, `include/`, `.vscode` confi
 1. Open an empty folder in VS Code  
 2. Press `Ctrl+Shift+P` and run **"C/C++ Project Generator: Create C Project"** or **"Create C++ Project"**  
 3. Enter your project name  
-4. Start coding
+4. Edit the `CMakePresets.json` file for your *compiler setup*
+5. Start coding
 
 ## Requirements
 
@@ -26,22 +27,26 @@ It sets up a standard project structure with `src/`, `include/`, `.vscode` confi
 
 ## Notice
 
-- Editing the CMakeLists.txt might be necessary
-- The user must create the `CMakePresets.json` via *Command Palette*
+- Editing the CMakeLists.txt **might** be necessary
+- The user **must Edit** the `CMakePresets.json` for proper setup
 
 ## Project Structure
 
 ```cs
 my-project/
-   ├── .vscode/         # VSCode configuration
-   ├── src/             # Source files
-   ├── include/         # Header files
-   ├── CMakeLists.txt   # CMake configuration
-   ├── .clang-format    # Code formatting rules
-   ├── .editorconfig    # Editor configuration
-   ├── .gitignore       # Git ignore rules
-   ├── .gitattributes   # Git attributes
-   ├── ChangeLog.md     # Change log
+   ├── .vscode/            # VSCode configuration
+   ├── src/                # Source files
+   ├── include/            # Header files
+   ├── deps/               # manually collected pkgs
+   ├── docs/               # Project documentation
+   ├── CMakeLists.txt      # CMake configuration
+   ├── CMakePresets.json   # CMake Presets
+   ├── vcpkg.json          # vcpkg dependencies
+   ├── .clang-format       # Code formatting rules
+   ├── .editorconfig       # Editor configuration
+   ├── .gitignore          # Git ignore rules
+   ├── .gitattributes      # Git attributes
+   ├── ChangeLog.md        # Change log
    └── README.md 
 ```
 
