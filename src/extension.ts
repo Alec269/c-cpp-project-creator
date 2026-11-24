@@ -1,7 +1,19 @@
+import { compilerRegistry, getCompilerPath } from './find-items';
 // src\extension.ts
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+
+import "./find-items";
+import { getCompiler } from './find-items';
+import { outputChannel } from './logger';
+
+const extensionName = "C/C++ Project Creator";
+const cmakeVersion = "4.0";
+const CStandard = 23;
+const CppStandard = 23;
+
+
 
 //# ------------------------------ TYPES AND INTERFACES ------------------------------ //
 
@@ -15,6 +27,13 @@ interface ProjectFile {
 //# ------------------------------ EXTENSION ACTIVATION ------------------------------ //
 
 export function activate(context: vscode.ExtensionContext) {
+   context.subscriptions.push(outputChannel);
+   outputChannel.appendLine(`${extensionName} has been activated`);
+
+   outputChannel.info("Scanning for compilers...");
+   getCompiler().then();
+   outputChannel.info(`Compiler scan complete. Found ${compilerRegistry.length} compilers.`);
+
    let createCProject = vscode.commands.registerCommand('cpp-project-generator.createCProject', () => {
       createProject('c');
    });
@@ -34,6 +53,8 @@ export function deactivate() { }
 //# ------------------------------ MAIN PROJECT CREATION LOGIC ------------------------------ //
 
 async function createProject(language: ProjType) {
+
+   outputChannel.info(`Creating ${language} project...`)
    const workspaceFolders = vscode.workspace.workspaceFolders;
    if (!workspaceFolders) {
       vscode.window.showErrorMessage('Please open a workspace folder first.');
@@ -92,7 +113,7 @@ async function createProjectStructure(projectPath: string, projectName: string, 
 }
 
 function createDirectories(projectPath: string) {
-   const directories = ['.vscode', 'src', 'deps', 'include', 'docs'];
+   const directories = ['.vscode', 'src', 'deps', 'include', 'docs', '.github', '.gitlab'];
    directories.forEach(dir => {
       const dirPath = path.join(projectPath, dir);
       if (!fs.existsSync(dirPath)) {
@@ -129,6 +150,12 @@ function generateProjectFiles(projectName: string, language: ProjType): ProjectF
       { path: '.vscode/launch.json', content: createLaunchJson(projectName) },
       { path: '.vscode/extensions.json', content: createExtJson() },
 
+      { path: 'docs/.gitkeep', content: '' },
+      { path: 'deps/.gitkeep', content: '' },
+      { path: 'include/.gitkeep', content: '' },
+      { path: '.github/.gitkeep', content: '' },
+      { path: '.gitlab/.gitkeep', content: '' },
+
       // Source files
       { path: `src/main.${language === 'c' ? 'c' : 'cpp'}`, content: createMainFile(language) },
       { path: `src/main.${language === 'c' ? 'h' : 'hpp'}`, content: createMainHeaderFile(language) },
@@ -139,16 +166,17 @@ function generateProjectFiles(projectName: string, language: ProjType): ProjectF
 
       // Configuration files
       { path: '.editorconfig', content: createEditorConfig() },
-      { path: '.clang-format', content: createClangFormat() },
-      { path: 'vcpkg.json', content: createVcpkgJson(projectName) },
+      { path: '.clang-format', content: createClangFormat(language) },
+      { path: 'vcpkg.json', content: createVcpkgJson(projectName, language) },
 
       // Git configuration
       { path: '.gitignore', content: createGitIgnore() },
       { path: '.gitattributes', content: createGitAttributes() },
 
       // Documentation
-      { path: 'README.md', content: createReadme(projectName, language) },
-      { path: 'ChangeLog.md', content: createChangeLog(projectName, language) }
+      { path: 'readme.md', content: createReadme(projectName, language) },
+      { path: 'changelog.md', content: createChangeLog() },
+      { path: 'license.md', content: createLicense() }
    ];
 }
 
@@ -170,8 +198,8 @@ function createCppPropertiesJson(language: ProjType): string {
             ],
             "windowsSdkVersion": "10.0.19041.0",
             "compilerPath": "cl.exe",
-            "cStandard": "c17",
-            "cppStandard": "c++23",
+            "cStandard": `c${CStandard}`,
+            "cppStandard": `c++${CppStandard}`,
             "intelliSenseMode": "${default}",
             "configurationProvider": "ms-vscode.cmake-tools"
          },
@@ -183,15 +211,15 @@ function createCppPropertiesJson(language: ProjType): string {
             ],
             "defines": [],
             "compilerPath": language === 'c' ? "/usr/bin/gcc" : "/usr/bin/g++",
-            "cStandard": "c17",
-            "cppStandard": "c++23",
+            "cStandard": `c${CStandard}`,
+            "cppStandard": `c++${CppStandard}`,
             "intelliSenseMode": "linux-gcc-x64",
             "configurationProvider": "ms-vscode.cmake-tools"
          },
          {
             "name": "darwin",
             "includePath": [
-               "${workspaceFolder}/**", /**  ??  */
+               "${workspaceFolder}/**",
                "${workspaceFolder}/include"
             ],
             "defines": [],
@@ -199,8 +227,8 @@ function createCppPropertiesJson(language: ProjType): string {
                "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks"
             ],
             "compilerPath": language === 'c' ? "/usr/bin/clang" : "/usr/bin/clang++",
-            "cStandard": "c17",
-            "cppStandard": "c++23",
+            "cStandard": `c${CStandard}`,
+            "cppStandard": `c++${CppStandard}`,
             "intelliSenseMode": "clang-x64",
             "configurationProvider": "ms-vscode.cmake-tools"
          }
@@ -212,45 +240,25 @@ function createCppPropertiesJson(language: ProjType): string {
 function createSettingsJson(): string {
    return JSON.stringify({
       "cmake.buildDirectory": "${workspaceFolder}/out/build/",
-      //"cmake.configureOnOpen": true,
+      "cmake.configureOnOpen": true,
       "material-icon-theme.folders.associations": {
          "deps": "include"
       },
       "files.associations": {
          "*.h": "c",
+         "*.c": "c",
          "*.hpp": "cpp",
          "*.cpp": "cpp",
-         "*.c": "c"
+         "*.cxx": "cpp",
+         "*.ixx": "cpp",
+         "*.cppm": "cpp",
       },
-      "editor.formatOnSave": true,
-      //"C_Cpp.default.formatStyle": "file",
+      "C_Cpp.default.formatStyle": "file",
       "C_Cpp.clang_format_fallbackStyle": "{ BasedOnStyle: Microsoft, IndentWidth: 3, TabWidth: 3 }",
       "cmake.generator": "Ninja",
-      "cSpell.words": [
-         "Allman",
-         "binlog",
-         "buildsystems",
-         "constexpr",
-         "cout",
-         "cppdbg",
-         "cppm",
-         "metaproj",
-         "MSVC",
-         "msys",
-         "msysgit",
-         "opendb",
-         "penv",
-         "pidb",
-         "pkgs",
-         "PROJECTNAME",
-         "Reflow",
-         "runsheet",
-         "smod",
-         "vspx",
-         "Wpedantic"
-      ],
       "clangd.arguments": [
-         "--compile-commands-dir=${workspaceFolder}/out/bin/Clang/"
+         "--compile-commands-dir=${workspaceFolder}/out/build/${presetName}/",
+         `--query-driver=path/to/compilerEXE`
       ],
       "C_Cpp.default.compileCommands": [
          ""
@@ -270,7 +278,11 @@ function createTasksJson(): string {
                "kind": "build",
                "isDefault": true
             },
-            "problemMatcher": "$gcc"
+            "problemMatcher": [
+               "$msCompile",
+               "$lessc",
+               "$gcc"
+            ]
          },
          {
             "label": "Clean",
@@ -320,8 +332,6 @@ function createLaunchJson(projectName: string): string {
             "request": "launch",
             "name": "LLDB_Launch",
             "program": `\${workspaceFolder}/out/build/bin/${projectName}`,
-            // or
-            "useThisOne": `\${workspaceFolder}/out/build/bin/Debug/${projectName}`,
             "args": [],
             "cwd": "${workspaceFolder}"
          }
@@ -397,7 +407,7 @@ function createMainHeaderFile(language: ProjType): string {
    } else {
       return (
          `#pragma once
-// add declarations here
+
          `
       );
    }
@@ -407,18 +417,18 @@ function createMainHeaderFile(language: ProjType): string {
 
 function createCMakeFile(projectName: string, language: ProjType): string {
 
-   const standard = (language === 'c' ? '17' : '23');
+   const standard = (language === 'c' ? CStandard : CppStandard);
    const langUpper = (language === 'c' ? 'C' : 'CXX');
    return (
       `
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION ${cmakeVersion})
 
 # # if you wish to use \`vcpkg\`
 # Add the following to CMake cache variable in 'CMakePresets.json'
 # "CMAKE_TOOLCHAIN_FILE":"$penv{VCPKG_ROOT}\\scripts\\buildsystems\\vcpkg.cmake"
 # Also, make sure 'VCPKG_ROOT' is defined in User Environment variables
 
-project(${projectName} LANGUAGES ${langUpper} VERSION 0.1.0)
+project("${projectName}" LANGUAGES ${langUpper} VERSION 0.0.1)
     
 # Set ${langUpper} standard
 set(CMAKE_${langUpper}_STANDARD ${standard})
@@ -439,7 +449,7 @@ target_include_directories(\${PROJECT_NAME} PRIVATE
 )
 
 # # If you get debugging issues
-# comment the below 7 lines (31 - 37)
+# comment the 7 lines below (31 - 37)
 set(ABS_BIN_DIR \${CMAKE_SOURCE_DIR}/out/build/bin)
 
 set_target_properties(\${PROJECT_NAME} PROPERTIES
@@ -497,27 +507,46 @@ install(TARGETS \${PROJECT_NAME}
    );
 }
 
+
+
 function createCMakePresetsFile(): string {
+
+   const { gccPath, gppPath, clangPath, clangppPath } = getCompilerPath();
 
    return JSON.stringify(
       {
          "version": 8,
          "configurePresets": [
             {
-               "name": "base",
+               "name": "clang-base",
                "hidden": true,
                "binaryDir": "${sourceDir}/out/build/${presetName}",
                "generator": "Ninja",
                "cacheVariables": {
                   "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                  "CMAKE_C_COMPILER": "C:/Program Files/LLVM/bin/clang.exe",
-                  "CMAKE_CXX_COMPILER": "C:/Program Files/LLVM/bin/clang++.exe",
+                  "CMAKE_C_COMPILER": `${clangPath}`,
+                  "CMAKE_CXX_COMPILER": `${clangppPath}`,
                   "USE_ASAN": "OFF"
                }
             },
             {
+               "name": "GCC-base",
+               "hidden": true,
+               "binaryDir": "${sourceDir}/out/build/${presetName}",
+               "generator": "Ninja",
+               "cacheVariables": {
+                  "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                  "CMAKE_C_COMPILER": `${gccPath}`,
+                  "CMAKE_CXX_COMPILER": `${gppPath}`,
+                  "USE_ASAN": "OFF"
+               },
+               "environment": {
+                  "PATH": `${path.dirname(gccPath)};$penv{PATH}`
+               }
+            },
+            {
                "name": "Clang-Debug",
-               "inherits": "base",
+               "inherits": "clang-base",
                "cacheVariables": {
                   "CMAKE_BUILD_TYPE": "Debug"
                }
@@ -531,14 +560,46 @@ function createCMakePresetsFile(): string {
             },
             {
                "name": "Clang-Release",
-               "inherits": "base",
+               "inherits": "clang-base",
                "cacheVariables": {
                   "CMAKE_BUILD_TYPE": "Release"
                }
             },
             {
-               "name": "VSx64-17",
+               "name": "GCC-Debug",
+               "inherits": "GCC-base",
+               "cacheVariables": {
+                  "CMAKE_BUILD_TYPE": "Debug"
+               }
+            },
+            {
+               "name": "GCC-Debug-ASan",
+               "inherits": "GCC-Debug",
+               "cacheVariables": {
+                  "USE_ASAN": "ON"
+               }
+            },
+            {
+               "name": "GCC-Release",
+               "inherits": "GCC-base",
+               "cacheVariables": {
+                  "CMAKE_BUILD_TYPE": "Release"
+               }
+            },
+            {
+               "name": "VSx64_17",
                "generator": "Visual Studio 17 2022",
+               "toolset": "host=x64",
+               "architecture": "x64",
+               "binaryDir": "${sourceDir}/out/build/${presetName}",
+               "cacheVariables": {
+                  "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                  "USE_ASAN": "OFF"
+               }
+            },
+            {
+               "name": "VSx64_v18",
+               "generator": "Visual Studio 18 2026",
                "toolset": "host=x64",
                "architecture": "x64",
                "binaryDir": "${sourceDir}/out/build/${presetName}",
@@ -562,23 +623,53 @@ function createCMakePresetsFile(): string {
                "configurePreset": "Clang-Release"
             },
             {
-               "name": "VS-Debug",
-               "configurePreset": "VSx64-17",
+               "name": "GCC-Debug",
+               "configurePreset": "GCC-Debug"
+            },
+            {
+               "name": "GCC-ASan",
+               "configurePreset": "GCC-Debug-ASan"
+            },
+            {
+               "name": "GCC-Release",
+               "configurePreset": "GCC-Release"
+            },
+            {
+               "name": "VS-Debug17",
+               "configurePreset": "VSx64_17",
                "configuration": "Debug"
             },
             {
-               "name": "VS-ASan",
-               "configurePreset": "VSx64-17",
+               "name": "VS-ASan17",
+               "configurePreset": "VSx64_17",
                "configuration": "Debug",
                "environment": {
                   "USE_ASAN": "ON"
                }
             },
             {
-               "name": "VS-Release",
-               "configurePreset": "VSx64-17",
+               "name": "VS-Release17",
+               "configurePreset": "VSx64_17",
                "configuration": "Release"
-            }
+            },
+            {
+               "name": "VS-Release18",
+               "configurePreset": "VSx64_v18",
+               "configuration": "Release"
+            },
+            {
+               "name": "VS-ASan18",
+               "configurePreset": "VSx64_v18",
+               "configuration": "Debug",
+               "environment": {
+                  "USE_ASAN": "ON"
+               }
+            },
+            {
+               "name": "VS-Debug18",
+               "configurePreset": "VSx64_v18",
+               "configuration": "Debug"
+            },
          ]
       },
       null, 3);
@@ -621,14 +712,14 @@ indent_size = 2
    );
 }
 
-function createClangFormat(): string {
+function createClangFormat(language: ProjType): string {
    return `---
-Language: Cpp
+Language: ${language == 'cpp' ? "Cpp" : "C"}
 BasedOnStyle: Microsoft
 IndentWidth: 3
 TabWidth: 3
 UseTab: true
-ColumnLimit: 100
+ColumnLimit: 120
 BreakBeforeBraces: Custom
 BraceWrapping:
   AfterFunction: true
@@ -638,8 +729,8 @@ BraceWrapping:
   AfterNamespace: true
 
   # Keep conditionals attached
-  AfterControlStatement: false
   AfterEnum: false
+  AfterControlStatement: false
   AfterExternBlock: false
   AfterObjCDeclaration: false
   BeforeElse: false
@@ -704,14 +795,14 @@ Standard: Latest
 `;
 }
 
-function createVcpkgJson(projectName: string): string {
+function createVcpkgJson(projectName: string, language: string): string {
    return JSON.stringify({
       "name": projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       "version": "1.0.0",
-      "description": `A ${projectName} project using vcpkg for dependency management generated with C/C++ Project Creator extension`,
+      "description": `${projectName}: A ${language} project using vcpkg for dependency management, generated with 'C/C++ Project Creator' extension`,
       "homepage": "",
       "dependencies": [],
-      "builtin-baseline": "12159785447291b4069c82a3fe9c2770a393ac7f",
+      "builtin-baseline": "",
       "overrides": []
    }, null, 3);
 }
@@ -851,6 +942,7 @@ function createGitAttributes(): string {
 # Archives
 *.7z     binary
 *.gz     binary
+*.xz     binary
 *.tar    binary
 *.tgz    binary
 *.zip    binary
@@ -862,13 +954,17 @@ function createGitAttributes(): string {
 *.yaml   text eol=crlf
 *.json   text eol=crlf
 
-# Windows batch files should have CRLF endings
+# Windows batch/script files should have CRLF endings
 *.bat    text eol=crlf
 *.cmd    text eol=crlf
+*.ps1    text eol=crlf
+*.nu     text eol=crlf
 
-# Shell scripts should always have LF endings
-*.sh     text eol=lf
-*.fish   text eol=lf
+# unix scripts should always have LF endings
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.fish      text eol=lf
+
 # git
 .gitignore      text eol=lf
 .gitattributes  text eol=lf
@@ -903,26 +999,28 @@ A ${langUpper} project created with the VSCode **C/C++ Project Creator** extensi
 
 \`\`\`sh
 Project-Directory/
+├── .github/            # Github configurations (empty)
+├── .gitlab/            # Gitlab configurations (empty)
 ├── .vscode/            # VSCode configuration
-├── src/                # Source files
-├── include/            # Header files
 ├── deps/               # manually collected pkgs
 ├── docs/               # Project documentation
-├── build/              # Build output (generated)
+├── include/            # Header files
+├── src/                # Source files
 ├── CMakeLists.txt      # CMake configuration
 ├── CMakePresets.json   # CMake Presets
-├── vcpkg.json          # vcpkg dependencies
+├── vcpkg.json          # vcpkg dependencies ("builtin-baseline" left empty)
 ├── .clang-format       # Code formatting rules
 ├── .editorconfig       # Editor configuration
 ├── .gitignore          # Git ignore rules
 ├── .gitattributes      # Git attributes
-├── ChangeLog.md        # Changelog file
-└── README.md           # This file
+├── changelog.md        # Changelog file
+├── license.md          # license file
+└── readme.md           # This file
 \`\`\`
 
 ## Features
 
-- Modern ${langUpper} standards (${language === 'c' ? 'C17' : 'C++23'})
+- Modern ${langUpper} standards (${language === 'c' ? `C${CStandard}` : `C++${CppStandard}`})
 - CMake build system
 - vcpkg integration for package management
 - Clang-format for code formatting
@@ -939,14 +1037,30 @@ Edit \`vcpkg.json\` to add dependencies:
 
 \`\`\`jsonc
 {
-   "dependencies": [
-      "fmt",
-      "spdlog"
-   ]
+  "dependencies": [
+    "fmt",
+    "spdlog"
+  ]
 }
 \`\`\`
 
-Then reconfigure CMake to install the dependencies.
+then perform:
+
+\`\`\`pwsh
+> vcpkg install
+\`\`\`
+
+
+> ## One might get the following output
+>
+> \`\`\`pwsh
+> the top-level builtin-baseline () was not a valid commit sha: expected 40 hexadecimal characters.
+> You can use the current commit as a baseline, which is:
+>         "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489"
+> 
+> Then reconfigure CMake to install the dependencies.
+>\`\`\`
+
 
 ## Debugging
 
@@ -955,8 +1069,8 @@ Press \`F5\` in VSCode to start debugging, or use the "Debug" configuration in t
 }
 
 
-function createChangeLog(projectName: string, language: ProjType): string {
-   const langUpper = language.toUpperCase();
+function createChangeLog(): string {
+
    return `
 # Change Log
 
@@ -965,57 +1079,36 @@ function createChangeLog(projectName: string, language: ProjType): string {
    The format is based on [Keep a Changelog](http://keepachangelog.com/)
    and this project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased] - yyyy-mm-dd
-
-   Here we write upgrading notes for brands. It's a team effort to make them as
-   straightforward as possible.
+## [v1.0.0] - yyyy-mm-dd
 
 ### Added
 
-- [PROJECTNAME-XXXX](http://tickets.projectname.com/browse/PROJECTNAME-XXXX)
-     MINOR Ticket title goes here.
-- [PROJECTNAME-YYYY](http://tickets.projectname.com/browse/PROJECTNAME-YYYY)
-     PATCH Ticket title goes here.
+  -
+  
 
 ### Changed
 
--
+  -
 
 ### Fixed
 
--
+  -
 
 ## [vX.X.X] - yyyy-mm-dd
 
-   Here we would have the update steps for vX.X.X for people to follow.
 
-### Added
-
--
-
-### Changed
-
-- [PROJECTNAME-ZZZZ](http://tickets.projectname.com/browse/PROJECTNAME-ZZZZ)
-     PATCH Drupal.org is now used for composer.
-
-### Fixed
-
-- [PROJECTNAME-TTTT](http://tickets.projectname.com/browse/PROJECTNAME-TTTT)
-     PATCH Add logic to runsheet teaser delete to delete corresponding
-     schedule cards.
-
-## [vX.X.X] - yyyy-mm-dd
-
-### Added
-
-### Changed
-
-### Fixed
-
-- [PROJECTNAME-UUUU](http://tickets.projectname.com/browse/PROJECTNAME-UUUU)
-     MINOR Fix module foo tests
-- [PROJECTNAME-RRRR](http://tickets.projectname.com/browse/PROJECTNAME-RRRR)
-     MAJOR Module foo's timeline uses the browser timezone for date resolution
 `;
 }
 
+function createLicense(): string {
+   return `
+Copyright ${new Date().getFullYear()} <COPYRIGHT HOLDER>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+`;
+}

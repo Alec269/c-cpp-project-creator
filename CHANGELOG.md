@@ -57,3 +57,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - If using `Visual Studio 2026` user must change the generator to "Visual Studio 18 2026"
   - Added proper `debug` and `release` mode setup.
   - Improved config files
+
+## [1.4.0] - 2026-11-25
+
+- Minor Update
+  - Added automatic discovery of GCC, G++, Clang, Clang++, and MSVC compiler executables
+  - Populated GCC and Clang CMake presets with detected compiler paths
+  - Added Visual Studio 2026 (`Visual Studio 18 2026`) presets and build configurations
+  - Updated generated projects to use C23/C++23 and CMake 4.0
+  - Added `.github/`, `.gitlab/`, `license.md`, and `changelog.md` to generated project scaffolding
+  - Improved generated VS Code tasks, launch configurations, settings, formatting, and debug setup
+  - Added an extension output channel for compiler discovery and logging
+  - Improved generated README, vcpkg configuration, and project metadata
+  - Moved the extension icon to the `assets/` directory

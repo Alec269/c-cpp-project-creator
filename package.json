@@ -2,10 +2,13 @@
    "name": "c-cpp-project-creator",
    "displayName": "C/C++ Project Creator",
    "description": "Generate Modern C and C++ project templates with CMake, VCpkg, and VSCode configurations",
-   "version": "1.3.0",
+   "version": "1.4.0",
    "license": "MIT",
    "publisher": "Alec269",
-   "icon": "icon.png",
+   "author": {
+      "name": "Nomayer Alam"
+   },
+   "icon": "assets/icon.png",
    "repository": {
       "type": "git",
       "url": "https://github.com/Alec269/c-cpp-project-creator.git"
